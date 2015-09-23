@@ -26,6 +26,7 @@ int Height;
 bool inv = false;
 const int N = 1024;
 const int numThreads = 16;
+Complex* W = new Complex[N / 2];
 
 bool* chainLock;
 bool globalLock;
@@ -86,13 +87,13 @@ void BitReverseOrder(Complex* matrix, Complex* buffer)
 void prepare_W()
 {
   for(int i = 0; i < N / 2; i++)
-    W[i] = Complex(cos(2*M_PI*n/N), -sin(2*M_PI*n/N));
+    W[i] = Complex(cos(2*M_PI*i/N), -sin(2*M_PI*i/N));
 }
 
 void prepare_W_inv()
 {
   for(int i = 0; i < N / 2; i++)
-    W[i] = Complex(cos(2*M_PI*n/N), sin(2*M_PI*n/N));
+    W[i] = Complex(cos(2*M_PI*i/N), sin(2*M_PI*i/N));
 }
 
 // GRAD Students implement the following 2 functions.
@@ -114,10 +115,10 @@ void MyBarrier(int id) // Again likely need parameters
 {
   chainLock[id] = !chainLock[id];
   pthread_mutex_lock(&Mutex);
-  int me = count;
-  count--;
+  int me = counter;
+  counter--;
   pthread_mutex_unlock(&Mutex);
-  if(count == 1) {
+  if(me == 1) {
     globalLock = false;
   }
   else {
@@ -140,7 +141,7 @@ void Transform1D(Complex* h, int N, Complex* W)
         int offset = np/2;
         tmp = h[i + j];
         h[i + j] = h[i + j] + W[j*N/np] * h[i + j + offset];
-        h[i + j + offset] = temp - W[j*N/np] * h[i + j + offset];
+        h[i + j + offset] = tmp - W[j*N/np] * h[i + j + offset];
       }
     }
   }
@@ -162,9 +163,9 @@ void* Transform2DTHread(void* v)
   // wait for all to complete
   // Calculate 1d DFT for assigned columns
   // Decrement active count and signal main if all complete
-  int id = (int)v;
+  unsigned long id = (unsigned long)v;
 
-  int startRow = id * n / numThreads;
+  int startRow = id * N / numThreads;
   for(int i = 0; i < N / numThreads; i++)
   {
     int startPos = N * (startRow + i);
@@ -187,7 +188,6 @@ void Transform2D(const char* inputFN)
   Width = image.GetWidth();
   Height = image.GetHeight();
   Complex* buffer = new Complex[N * N];
-  Complex* W = new Complex[N / 2];
 
   /****************************    2D FFT    ********************************/
 
@@ -220,7 +220,8 @@ void Transform2D(const char* inputFN)
 
   BitReverseOrder(Data, buffer);
 
-  pthread_t threads[numThreads];
+  MyBarrier_Init();
+
   for(int i = 0; i < numThreads; i++)
     pthread_create(&threads[i], 0, Transform2DTHread, (void*)i);
 
@@ -240,7 +241,8 @@ void Transform2D(const char* inputFN)
 
   BitReverseOrder(Data, buffer);
 
-  pthread_t threads[numThreads];
+  MyBarrier_Init();
+
   for(int i = 0; i < numThreads; i++)
     pthread_create(&threads[i], 0, Transform2DTHread, (void*)i);
 
@@ -248,9 +250,10 @@ void Transform2D(const char* inputFN)
 
   Transpose(Data, buffer);
 
+  MyBarrier_Init();
+  
   BitReverseOrder(Data, buffer);
 
-  pthread_t threads[numThreads];
   for(int i = 0; i < numThreads; i++)
     pthread_create(&threads[i], 0, Transform2DTHread, (void*)i);
 
