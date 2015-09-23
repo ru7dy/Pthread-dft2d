@@ -229,8 +229,8 @@ void Transform2D(const char* inputFN)
 
   Transpose(Data, buffer);
 
-  cout<<"Generating Image File MyAfter2D.txt"<<endl;
-  image.SaveImageData("MyAfter2D.txt", Data, Width, Height);
+  cout<<"Generating Image File Tower-DFT2D.txt"<<endl;
+  image.SaveImageData("Tower-DFT2D.txt", Data, Width, Height);
 
 
   /****************************   Inverse    ********************************/
